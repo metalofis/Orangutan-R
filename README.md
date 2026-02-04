@@ -179,12 +179,10 @@ run_orangutan(
   ),
   
   # ---------- Multivariate test seeds ----------
-  seed_disp = 123,                     # Seed for reproducible dispersion/randomization calculations
-  seed_perm = 456,                     # Seed for reproducible permutation tests
+  seeds = list(betadisper = 123, permanova = 456),   # Seed for reproducible dispersion/randomization calculations and permutation tests
   
-  # ---------- Plot saving / messaging ----------
-  save_plots = TRUE,                   # Whether to save plots to output directory
-  verbose    = FALSE                   # Whether to print progress messages in console
+  # ---------- Messaging ----------
+  verbose = FALSE                                    # Whether to print progress messages in console
 )
 ```
 

@@ -1,5 +1,7 @@
 # Orangutan
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18488056.svg)](https://doi.org/10.5281/zenodo.18488056)
+
 Orangutan is an R package for analyzing and visualizing measurements (morphometrics) from groups such as species or populations. It runs a full analysis pipeline that summarizes data, finds variables that differentiate groups, performs multivariate and univariate statistics, and produces publication-ready plots.
 
 ## Table of Contents

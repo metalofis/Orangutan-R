@@ -261,10 +261,16 @@ Use `label_templates` with sprintf-style placeholders:
 ## Input data format
 
 - A CSV with a `species` column and one or more numeric measurement columns.
+  
+| species        | main_length | Head_length | Supralabials |
+|---------------|-------------|-------------|--------------|
+| allisoni      | 86.5        | 25.2        | 9            |
+| allisoni      | 73.6        | 24.8        | 8            |
+| carolinensis  | 63.0        | 18.3        | 8            |
+| carolinensis  | 59.0        | 19.17       | 8            |
+| torresfundorai| 66.9        | 18.7        | 7            |
+| torresfundorai| 70.9        | 23.6        | 7            |
 
-Notes:
-- `species` is required and is treated as a grouping factor.
-- If you use allometry, the size column must contain strictly positive numbers.
 
 ## Citation
 

@@ -275,7 +275,7 @@ Use `label_templates` with sprintf-style placeholders:
 
 ## Citation
 
-Torres, J. (2025). Orangutan: an R package for analyzing and visualizing phenotypic data in the context of ecology and systematics. bioRxiv: https://doi.org/10.64898/2025.12.18.695244
+Torres, J. (2026). Orangutan: An R Package for Analyzing and Visualizing Phenotypic Data in the Context of Species Descriptions and Population Comparisons. Ecology and Evolution, 16(2), e73111. https://doi.org/10.1002/ece3.73111
 
 ## Contributing / Support
 

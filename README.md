@@ -8,8 +8,8 @@ Orangutan is an R package for analyzing and visualizing measurements (morphometr
 ## Table of Contents
 - [What Orangutan does](#what-orangutan-does)
 - [Installation](#installation)
-- [Quick start](#quick-start)
-- [Description of run_orangutan() arguments](#description-of-run_orangutan()-arguments)
+- [Implementation](#Implementation)
+- [Description of run_orangutan() arguments](#description-of-run_orangutan-arguments)
   - [Arguments](#arguments)
   - [Plot customization](#plot-customization)
 - [Input data format](#input-data-format)

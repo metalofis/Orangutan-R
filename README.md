@@ -107,7 +107,7 @@ devtools::install_github("metalofis/Orangutan-R")
 
 ## Implementation
 
-Runs an analysis with default parameters (writes results next to the input file by default):
+Quick example: `run_orangutan` called with default parameters (writes results next to the input file by default):
 
 ```r
 library(Orangutan)
@@ -115,15 +115,15 @@ library(Orangutan)
 run_orangutan("data/my_dataset.csv")
 ```
 
-Full example: run_orangutan called with all available arguments
+Full example: `run_orangutan` called with all available arguments
 
 ```r
 library(Orangutan)  # Load the Orangutan package
 
 run_orangutan(
   # ---------- Input / output ----------
-  data_path = "data/my_dataset.csv",  # Path to your input CSV dataset
-  output_dir = "orangutan_outputs",   # Folder where all outputs (plots, tables) will be saved
+  data_path = "data/my_dataset.csv",             # Path to your input CSV dataset
+  output_dir = "address/to/orangutan_outputs",   # Folder where all outputs (plots, tables) will be saved
   
   # ---------- Allometry ----------
   apply_allometry = TRUE,             # Whether to adjust measurements for allometry

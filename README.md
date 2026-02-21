@@ -88,15 +88,24 @@ Orangutan is an R package for analyzing and visualizing measurements (morphometr
 
 ## Installation
 
-Install devtools if needed, then install from GitHub:
+### Stable version (CRAN)
+
+Install the latest stable release from CRAN:
+
+```r
+install.packages("Orangutan")
+```
+
+### Development version (GitHub)
+
+Install the development version from GitHub (requires `devtools`):
 
 ```r
 install.packages("devtools")
-
 devtools::install_github("metalofis/Orangutan-R")
 ```
 
-## Quick start
+## Implementation
 
 Runs an analysis with default parameters (writes results next to the input file by default):
 

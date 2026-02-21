@@ -127,11 +127,11 @@ run_orangutan(
   
   # ---------- Allometry ----------
   apply_allometry = TRUE,             # Whether to adjust measurements for allometry
-  allometry_var = "main_length",      # Column used as the reference variable for allometry correction
+  allometry_var = "SVL",              # Column used as the reference variable for allometry correction
   
   # ---------- Outlier handling ----------
   remove_outliers = TRUE,             # Whether to remove extreme values (outliers)
-  outlier_vars = c("main_length"),    # Which variables to check for outliers
+  outlier_vars = c("SVL"),            # Which variables to check for outliers
   outlier_tail_pct = 0.05,            # Proportion of extreme values to remove from each tail (5% here)
   
   # ---------- PCA / DAPC highlighting ----------
@@ -181,8 +181,8 @@ run_orangutan(
   # ---------- Optional label templates ----------
   label_templates = list(
     nonoverlap_title = "Non-Overlapping Pair: %s vs %s for %s", # Title template for non-overlapping variable plots
-    pca_x = "PC1 (%s%% variance)",       # Label for PCA X-axis with variance placeholder
-    pca_y = "PC2 (%s%% variance)",       # Label for PCA Y-axis with variance placeholder
+    pca_x = "PC1 (%s%% variance)",       # Label for PCA X-axis with explained variance
+    pca_y = "PC2 (%s%% variance)",       # Label for PCA Y-axis with explained variance
     dapc_x = "LD1 (%s%%)",               # Label for DAPC X-axis with explained variance
     dapc_y = "LD2 (%s%%)",               # Label for DAPC Y-axis with explained variance
     dapc_title_1d = "DAPC – Single Discriminant Axis" # Title for one-dimensional DAPC plots
@@ -218,7 +218,7 @@ A short, plain-language list of the main parameters you can set when calling run
 
 You can change how plots look by passing small lists. Only set the keys you want to change — everything else uses defaults.
 
-Where to pass them: as named lists in the run_orangutan() call.
+Where to pass them: as named lists in the `run_orangutan()` call.
 
 1) Which plots are affected
 - Univariate: per-variable violin/box used for ANOVA/KW plots.
@@ -227,7 +227,7 @@ Where to pass them: as named lists in the run_orangutan() call.
 
 2) The lists you can provide and what each key does
 
-- point_aes (controls points/jitter). Default: point_size = 3.5, jitter_width = 0.1, jitter_alpha = 0.8, jitter_shape = 21, jitter_color = "black", jitter_stroke = 0.35
+- point_aes (controls points/jitter).
   - point_size: numeric — point size
   - jitter_width: numeric — horizontal jitter amount
   - jitter_alpha: numeric — transparency (0–1)
@@ -235,7 +235,7 @@ Where to pass them: as named lists in the run_orangutan() call.
   - jitter_color: color string — point outline color
   - jitter_stroke: numeric — outline width
 
-- mean_aes (the statistical mean marker). Default: size = 1.8, shape = 21, fill = "white", color = "black", stroke = 0.6
+- mean_aes (the statistical mean marker).
   - size: numeric
   - shape: integer
   - fill: fill color
@@ -243,13 +243,13 @@ Where to pass them: as named lists in the run_orangutan() call.
   - stroke: outline width
 
 - violin_aes
-  - alpha: transparency (0–1) — default 0.4
+  - alpha: transparency
 
 - box_aes
-  - alpha: transparency — default 0.4
-  - width: box width — default 0.15
+  - alpha: transparency
+  - width: box width
 
-- label_aes (controls label letters and text sizes). Default: text_size = 6, axis_text_size = 10, title_size = 12, label_offset = 0.05
+- label_aes (controls label letters and text sizes).
   - text_size: numeric — group-letter label size
   - axis_text_size: numeric — axis tick text size
   - title_size: numeric — plot title size

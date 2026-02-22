@@ -10,8 +10,6 @@ Orangutan is an R package for analyzing and visualizing measurements (morphometr
 - [Installation](#installation)
 - [Implementation](#Implementation)
 - [Description of run_orangutan() arguments](#description-of-run_orangutan-arguments)
-  - [Arguments](#arguments)
-  - [Plot customization](#plot-customization)
 - [Input data format](#input-data-format)
 - [Citation](#citation)
 - [Contributing / Support](#contributing--support)
@@ -138,7 +136,7 @@ run_orangutan(
   species_to_encircle = c("carolinensis", "torresfundorai"), # Species to highlight on PCA/DAPC plots
   
   # ---------- Color palette ----------
-  palette_name = "Paired",            # Name of the color palette for plots
+  palette_name = "Paired",            # Name of the color palette for plots ("Paired", "Set3", "Dark2")
   
   # ---------- Point aesthetics ----------
   point_aes = list(
@@ -198,9 +196,6 @@ run_orangutan(
 
 ## Description of run_orangutan() arguments
 
-### Arguments
-A short, plain-language list of the main parameters you can set when calling run_orangutan():
-
 - data_path: Path to your CSV file (**required**).
 - output_dir: Where results are saved (default: folder next to the input file).
 - apply_allometry: TRUE/FALSE — adjust measurements by a size variable.
@@ -213,59 +208,6 @@ A short, plain-language list of the main parameters you can set when calling run
 - seeds: Named list of seeds for reproducible random steps (default: `list(betadisper = 123, permanova = 456)`).
 - label_templates: Optional list to tweak plot labels and titles (sprintf-style templates).
 - point_aes, mean_aes, violin_aes, box_aes, label_aes: Lists to customize plot appearance (see Plot customization below).
-
-### Plot customization
-
-You can change how plots look by passing small lists. Only set the keys you want to change — everything else uses defaults.
-
-Where to pass them: as named lists in the `run_orangutan()` call.
-
-1) Which plots are affected
-- Univariate: per-variable violin/box used for ANOVA/KW plots.
-- Non-overlap: trait plots for species pairs that do not overlap.
-- Multivariate: PCA and DAPC plots (points, polygons, axis labels).
-
-2) The lists you can provide and what each key does
-
-- point_aes (controls points/jitter).
-  - point_size: numeric — point size
-  - jitter_width: numeric — horizontal jitter amount
-  - jitter_alpha: numeric — transparency (0–1)
-  - jitter_shape: integer — ggplot2 shape (21 is a filled circle)
-  - jitter_color: color string — point outline color
-  - jitter_stroke: numeric — outline width
-
-- mean_aes (the statistical mean marker).
-  - size: numeric
-  - shape: integer
-  - fill: fill color
-  - color: outline color
-  - stroke: outline width
-
-- violin_aes
-  - alpha: transparency
-
-- box_aes
-  - alpha: transparency
-  - width: box width
-
-- label_aes (controls label letters and text sizes).
-  - text_size: numeric — group-letter label size
-  - axis_text_size: numeric — axis tick text size
-  - title_size: numeric — plot title size
-  - label_offset: numeric — how far above the max value to put group letters (fraction of y-range)
-
-3) Label templates (custom text for axis labels and titles)
-Use `label_templates` with sprintf-style placeholders:
-
-- nonoverlap_title — title for non-overlap plots, expects (species1, species2, variable) — default "Non-Overlapping Pair: %s vs %s for %s"
-- pca_x, pca_y — labels for PC1/PC2, include "%s" for percent variance — default "PC1 (%s%%)", "PC2 (%s%%)"
-- dapc_x, dapc_y — labels for LD1/LD2
-- dapc_title_1d — title for 1D DAPC density plot
-
-4) Colors and palettes
-- Use `palette_name` (RColorBrewer names like "Paired", "Set3", "Dark2"). The package builds a species-aware palette and interpolates if there are more species than colors.
-- If you need an exact species→color mapping, the public API currently accepts only `palette_name`. To control exact mapping: (a) ensure the species are ordered in your CSV so the palette assignment is predictable, or (b) request support via an issue/PR to add a custom_colors parameter.
 
 
 ## Input data format

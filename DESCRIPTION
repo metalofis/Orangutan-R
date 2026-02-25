@@ -14,6 +14,7 @@ Description: Provides functions to analyze and visualize meristic and mensural
 URL: https://github.com/metalofis/Orangutan-R
 BugReports: https://github.com/metalofis/Orangutan-R/issues
 License: MIT + file LICENSE
+Repository: CRAN
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3

@@ -98,7 +98,7 @@ Orangutan is an R package for analyzing and visualizing measurements (morphometr
     - `orangutan_report.html`
 
 
-![Orangutan workflow](images/orangutan_workflow.png)
+![Orangutan workflow](images/orangutan_workflow.svg)
 
 
 ## Installation

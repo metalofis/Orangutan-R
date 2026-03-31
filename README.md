@@ -113,11 +113,11 @@ install.packages("Orangutan")
 
 ### Development version (GitHub)
 
-Install the development version from GitHub (requires `devtools`):
+Install the development version directly from GitHub using `pak` (the modern R package installer):
 
 ```r
-install.packages("devtools")
-devtools::install_github("metalofis/Orangutan-R")
+install.packages("pak")
+pak::pak("metalofis/Orangutan-R")
 ```
 
 ## Implementation

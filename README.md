@@ -11,8 +11,9 @@ Orangutan is an R package for analyzing and visualizing measurements (morphometr
 - [Implementation](#Implementation)
 - [Description of run_orangutan() arguments](#description-of-run_orangutan-arguments)
 - [Input data format](#input-data-format)
-- [Citation](#citation)
+- [HTML Report](#html-report)
 - [Contributing / Support](#contributing--support)
+- [Citation](#citation)
 
 
 ## What Orangutan does
@@ -46,8 +47,9 @@ Orangutan is an R package for analyzing and visualizing measurements (morphometr
 
 - **Performs Principal Components Analysis (PCA)** on scaled variables
   - Produces a PCA scatterplot with optional group encirclement.
-  - Reports variable loadings contributing to PC1 and PC2.
+  - Reports variable loadings contributing to PC1 and PC2 and visualizes them natively.
     - `09_multi_pca_plot.pdf`
+    - `09_multi_pca_top_loadings_PC1_PC2_plot.pdf`
     - `09_multi_pca_top_loadings_PC1_PC2.csv`
 
 - **Runs PCA axis post-hoc tests**
@@ -75,10 +77,25 @@ Orangutan is an R package for analyzing and visualizing measurements (morphometr
     - `13_uni_kruskalwallis_summary.csv`
     - `13_uni_kruskalwallis_plot_<variable>.pdf`
 
+- **Automatically identifies and analyzes categorical variables**
+  - Runs Pearson's Chi-squared tests between categorical traits and species.
+  - Uses simulated p-values for robustness with sparse data.
+  - Performs FDR-corrected pairwise post-hoc tests to detect specific species-level differences.
+  - Reports statistical reliability notes for small sample sizes (N < 50) or sparse cells.
+  - Produces proportional stacked bar plots using distinctly muted pastel palettes structurally separated from the main species aesthetics.
+    - `14_categorical_analysis_summary.csv`
+    - `14_categorical_percentages_summary.csv`
+    - `14_categorical_barplot_<variable>.pdf`
+
 - **Ensures reproducibility**
   - Saves all results, plots, configuration details, and methods summaries to `output_dir`.
-    - `00_run_config.txt` — exact function call, timestamp, environment
-    - `00_methods_summary.txt` — human-readable methods summary
+    - `00_methods_summary.txt` — human-readable methods summary alongside the exact R environment and call configurations.
+
+- **Generates an HTML interpretation report**
+  - Automatically produced at the end of every run.
+  - Summarizes results in plain language with embedded plot thumbnails.
+  - Covers all analysis sections: diagnostic traits, PERMANOVA, PCA, DAPC, and univariate tests.
+    - `orangutan_report.html`
 
 
 ![Orangutan workflow](images/orangutan_workflow.png)
@@ -137,6 +154,7 @@ run_orangutan(
   
   # ---------- Color palette ----------
   palette_name = "Paired",            # Name of the color palette for plots ("Paired", "Set3", "Dark2")
+  custom_colors = c(SpeciesA = "#FF0000", SpeciesB = "#00FF00"), # Optional: custom hex codes for specific species
   
   # ---------- Point aesthetics ----------
   point_aes = list(
@@ -205,6 +223,7 @@ run_orangutan(
 - outlier_tail_pct: How extreme to consider for outliers (default 0.05 = 5% tail).
 - species_to_encircle: Species names to highlight (draw polygons) in PCA/DAPC plots.
 - palette_name: RColorBrewer palette to use for colors (default "Paired").
+- custom_colors: Optional named vector of hex codes for species (e.g., `c(SpeciesA = "#FF0000")`).
 - seeds: Named list of seeds for reproducible random steps (default: `list(betadisper = 123, permanova = 456)`).
 - label_templates: Optional list to tweak plot labels and titles (sprintf-style templates).
 - point_aes, mean_aes, violin_aes, box_aes, label_aes: Lists to customize plot appearance (see Plot customization below).
@@ -214,21 +233,27 @@ run_orangutan(
 
 - A CSV with a `species` column and one or more numeric measurement columns.
   
-| species        | main_length | Head_length | Supralabials |
-|---------------|-------------|-------------|--------------|
-| allisoni      | 86.5        | 25.2        | 9            |
-| allisoni      | 73.6        | 24.8        | 8            |
-| carolinensis  | 63.0        | 18.3        | 8            |
-| carolinensis  | 59.0        | 19.17       | 8            |
-| torresfundorai| 66.9        | 18.7        | 7            |
-| torresfundorai| 70.9        | 23.6        | 7            |
+| species        | main_length | Head_length | Supralabials | Color |
+|---------------|-------------|-------------|--------------|--------|
+| allisoni      | 86.5        | 25.2        | 9            | Blue  |
+| allisoni      | 73.6        | 24.8        | 8            | Blue  |
+| carolinensis  | 63.0        | 18.3        | 8            | Green |
+| carolinensis  | 59.0        | 19.17       | 8            | Green |
+| torresfundorai| 66.9        | 18.7        | 7            | Green |
+| torresfundorai| 70.9        | 23.6        | 7            | Green |
 
 
-## Citation
+## HTML Report
 
-Torres, J. (2026). Orangutan: An R Package for Analyzing and Visualizing Phenotypic Data in the Context of Species Descriptions and Population Comparisons. Ecology and Evolution, 16(2), e73111. https://doi.org/10.1002/ece3.73111
+Every run automatically produces `orangutan_report.html` inside `output_dir`. Open it in any web browser to get a plain-language summary of all analysis sections, with embedded thumbnail images of the key plots. No extra arguments are needed — the report is generated by default.
+
 
 ## Contributing / Support
 
 - Open issues or pull requests on the project GitHub for bugs, feature requests, or improvements.
 - Add a star if this package was useful.
+
+
+## Citation
+
+Torres, J. (2026). Orangutan: An R Package for Analyzing and Visualizing Phenotypic Data in the Context of Species Descriptions and Population Comparisons. Ecology and Evolution, 16(2), e73111. https://doi.org/10.1002/ece3.73111

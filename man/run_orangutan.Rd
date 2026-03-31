@@ -6,13 +6,15 @@
 \usage{
 run_orangutan(
   data_path,
-  output_dir = file.path(dirname(data_path), "analysis_outputs"),
+  output_dir = file.path(dirname(data_path), paste0("orangutan_outputs_",
+    format(Sys.time(), "\%Y\%m\%d_\%H\%M\%S"))),
   apply_allometry = FALSE,
   allometry_var = NULL,
   remove_outliers = FALSE,
   outlier_vars = NULL,
   outlier_tail_pct = 0.05,
   palette_name = "Paired",
+  custom_colors = NULL,
   species_to_encircle = character(0),
   seeds = list(betadisper = 123, permanova = 456),
   point_aes = list(point_size = 3.5, jitter_width = 0.1, jitter_alpha = 0.8, jitter_shape
@@ -42,6 +44,8 @@ run_orangutan(
 \item{outlier_tail_pct}{Tail proportion for Tukey filtering}
 
 \item{palette_name}{RColorBrewer palette name}
+
+\item{custom_colors}{Optional named vector of hex colors for species (e.g., \code{c(A = "#FF0000")})}
 
 \item{species_to_encircle}{Species to encircle in multivariate plots}
 

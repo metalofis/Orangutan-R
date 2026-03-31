@@ -5,7 +5,7 @@ Authors@R: person(given = "Javier",
                      family = "Torres",
                      role = c("aut", "cre"),
                      email = "metalofis@gmail.com")
-Description: Provides functions to analyze and visualize meristic and mensural
+Description: Provides functions to analyze and visualize meristic, mensural, and categorical
     phenotypic data in a comparative framework. The package implements an
     automated pipeline that summarizes traits, identifies diagnostic variables
     among groups, performs multivariate and univariate statistical analyses, and

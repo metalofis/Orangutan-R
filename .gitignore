@@ -1,1 +1,4 @@
 .DS_Store
+.Rhistory
+.RData
+example_datasets/orangutan_outputs*

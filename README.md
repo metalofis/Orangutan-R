@@ -121,7 +121,7 @@ pak::pak("metalofis/Orangutan-R")
 
 ## Implementation
 
-Quick example: `run_orangutan` called with default parameters (writes results next to the input file by default):
+Minimal example: `run_orangutan` called with default parameters (writes results next to the input file by default):
 
 ```r
 library(Orangutan)

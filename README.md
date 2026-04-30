@@ -104,7 +104,7 @@ Orangutan is an R package for analyzing and visualizing measurements (morphometr
 
 ### Stable version (CRAN)
 
-Install the latest stable release from CRAN (v2.0.0):
+Install the latest stable release from CRAN (v2.1.0):
 
 ```r
 install.packages("Orangutan")

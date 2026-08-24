@@ -112,7 +112,7 @@ Orangutan is an R package for analyzing and visualizing measurements (morphometr
 - **Generates an HTML interpretation report**
   - Automatically produced at the end of every run.
   - Summarizes results in plain language with embedded plot thumbnails.
-  - Covers all analysis sections: diagnostic traits, overlap coefficients, PERMANOVA, PCA, hull areas, DAPC, DAPC cross-validation, univariate tests.
+  - Covers all analysis sections: diagnostic traits, overlap coefficients, PERMANOVA, PCA, hull areas, DAPC, DAPC cross-validation, univariate tests, and categorical analyses.
     - `orangutan_report.html`
 
 
@@ -252,6 +252,7 @@ run_orangutan(
 - dapc_cv_k: Number of folds for DAPC cross-validation (default 10; 0/1 skips the analysis).
 - hull_boot_B: Number of bootstrap resamples for PCA hull-area confidence intervals (default 999).
 - label_templates: Optional list to tweak plot labels and titles (sprintf-style templates).
+- verbose: TRUE/FALSE — print progress messages to the console during the run (default FALSE).
 - point_aes, mean_aes, violin_aes, box_aes, label_aes: Lists to customize plot appearance (see Plot customization below).
 
 

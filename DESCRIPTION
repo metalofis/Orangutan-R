@@ -1,6 +1,6 @@
 Package: Orangutan
 Title: Automated Analysis of Phenotypic Data
-Version: 2.1.0
+Version: 2.2.0
 Authors@R: person(given = "Javier",
                      family = "Torres",
                      role = c("aut", "cre"),

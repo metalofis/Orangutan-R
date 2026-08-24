@@ -16,7 +16,7 @@ run_orangutan(
   palette_name = "Paired",
   custom_colors = NULL,
   species_to_encircle = character(0),
-  seeds = list(betadisper = 123, permanova = 456),
+  seeds = list(betadisper = 123, permanova = 456, hull = 123, dapc_cv = 789),
   point_aes = list(point_size = 3.5, jitter_width = 0.1, jitter_alpha = 0.8, jitter_shape
     = 21, jitter_color = "black", jitter_stroke = 0.35),
   mean_aes = list(size = 1.8, shape = 21, fill = "white", color = "black", stroke = 0.6),
@@ -25,6 +25,8 @@ run_orangutan(
   label_aes = list(text_size = 6, axis_text_size = 10, title_size = 12, label_offset =
     0.05),
   label_templates = NULL,
+  dapc_cv_k = 10,
+  hull_boot_B = 999,
   verbose = FALSE
 )
 }
@@ -50,9 +52,11 @@ run_orangutan(
 \item{species_to_encircle}{Species to encircle in multivariate plots}
 
 \item{seeds}{A named list of integer seeds for reproducibility, with elements:
-\code{betadisper} for beta-dispersion permutation tests and
-\code{permanova} for PERMANOVA permutation tests.
-Defaults to \code{list(betadisper = 123, permanova = 456)}.}
+\code{betadisper} for beta-dispersion permutation tests,
+\code{permanova} for PERMANOVA permutation tests,
+\code{hull} for PCA hull-area bootstraps, and
+\code{dapc_cv} for DAPC cross-validation fold assignment.
+Defaults to \code{list(betadisper = 123, permanova = 456, hull = 123, dapc_cv = 789)}.}
 
 \item{point_aes}{List of point aesthetics}
 
@@ -65,6 +69,10 @@ Defaults to \code{list(betadisper = 123, permanova = 456)}.}
 \item{label_aes}{List of label/text aesthetics}
 
 \item{label_templates}{Optional plot label templates}
+
+\item{dapc_cv_k}{Number of folds for DAPC cross-validation (default: 10; use 0 or 1 to skip).}
+
+\item{hull_boot_B}{Number of bootstrap resamples for PCA hull-area confidence intervals (default: 999).}
 
 \item{verbose}{Logical; if TRUE, print progress messages. Defaults to FALSE.}
 }

@@ -30,7 +30,10 @@ generate_html_report <- function(output_dir) {
     "</head>",
     "<body>",
     "<h1>Orangutan Phenotypic Analysis Report</h1>",
-    paste0("<p>Generated on: ", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "</p>")
+    paste0("<p>Generated on: ", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "</p>"),
+    "<div class='interpretation'><strong>Cite this work as:</strong> Torres, J. (2026). Orangutan: An R Package for Analyzing and Visualizing Phenotypic Data in the Context of Species Descriptions and Population Comparisons. <em>Ecology and Evolution</em>, 16(2), e73111. <a href='https://doi.org/10.1002/ece3.73111'>https://doi.org/10.1002/ece3.73111</a></div>",
+    "<h3>GitHub repository</h3>",
+    "<div class='interpretation'>The full source code, documentation, and issue tracker are available at <a href='https://github.com/metalofis/Orangutan-R'>https://github.com/metalofis/Orangutan-R</a>.</div>"
   )
 
   # ---- helpers ----
@@ -103,10 +106,24 @@ generate_html_report <- function(output_dir) {
     html <- c(html, "</div>")
   }
 
-  # ---- 3. Multivariate PERMANOVA ----
+  # ---- 3. Overlap Coefficients ----
+  ovl_tbl <- read_csv_safe("07_overlap_coefficients.csv")
+  if (!is.null(ovl_tbl) && nrow(ovl_tbl) > 0) {
+    html <- c(html, "<div class='section'>", "<h2>3. Overlap Coefficients (OVL)</h2>")
+    n_high <- if ("OVL" %in% colnames(ovl_tbl)) sum(ovl_tbl$OVL >= 0.80, na.rm = TRUE) else 0
+    n_low  <- if ("OVL" %in% colnames(ovl_tbl)) sum(ovl_tbl$OVL <= 0.20, na.rm = TRUE) else 0
+    interp <- paste0("Overlap coefficients (kernel-density OVL) quantify pairwise similarity of trait distributions (0 = no overlap, 1 = identical). ",
+                     "<strong>", n_high, "</strong> species-trait pair(s) show high overlap (OVL &ge; 0.80) &mdash; traits unlikely to distinguish those taxa; ",
+                     "<strong>", n_low, "</strong> pair(s) show near-complete separation (OVL &le; 0.20) &mdash; strongly diagnostic traits.")
+    html <- c(html, paste0("<div class='interpretation'>", interp, "</div>"))
+    html <- c(html, df_to_html_table(ovl_tbl))
+    html <- c(html, "</div>")
+  }
+
+  # ---- 4. Multivariate PERMANOVA ----
   permanova <- read_csv_safe("08_multi_permanova_species_effect.csv")
   if (!is.null(permanova)) {
-    html <- c(html, "<div class='section'>", "<h2>3. Multivariate PERMANOVA</h2>")
+    html <- c(html, "<div class='section'>", "<h2>4. Multivariate PERMANOVA</h2>")
     p_col <- grep("Pr\\(|p", colnames(permanova), ignore.case = TRUE)[1]
     p_val <- permanova[1, p_col]
     if (!is.na(p_val) && p_val < 0.05) {
@@ -130,15 +147,20 @@ generate_html_report <- function(output_dir) {
     html <- c(html, "</div>")
   }
 
-  # ---- 4. PCA ----
+  # ---- 5. PCA ----
   pca_posthoc <- read_csv_safe("09_multi_pca_posthoc.csv")
   if (!is.null(pca_posthoc)) {
-    html <- c(html, "<div class='section'>", "<h2>4. Principal Component Analysis (PCA)</h2>")
-    sig_axs <- pca_posthoc[!is.na(pca_posthoc$P_value) & pca_posthoc$P_value < 0.05, "PC"]
-    if (length(sig_axs) > 0) {
-      interp <- paste0("PCA axes that significantly separate species (using post-hoc tests): <strong>", paste(sig_axs, collapse = ", "), "</strong>.")
+    html <- c(html, "<div class='section'>", "<h2>5. Principal Component Analysis (PCA)</h2>")
+    pbh_col <- grep("P_BH", colnames(pca_posthoc), ignore.case = TRUE, value = TRUE)
+    if (length(pbh_col) > 0) {
+      sig_axs <- pca_posthoc[!is.na(pca_posthoc[[pbh_col]]) & pca_posthoc[[pbh_col]] < 0.05, "PC"]
     } else {
-      interp <- "No PCA axes significantly separated the species groups."
+      sig_axs <- pca_posthoc[!is.na(pca_posthoc$P_value) & pca_posthoc$P_value < 0.05, "PC"]
+    }
+    if (length(sig_axs) > 0) {
+      interp <- paste0("PCA axes that significantly separate species (post-hoc tests, FDR-adjusted <em>P</em> &lt; 0.05): <strong>", paste(sig_axs, collapse = ", "), "</strong>.")
+    } else {
+      interp <- "No PCA axes significantly separated the species groups after FDR correction."
     }
     html <- c(html, paste0("<div class='interpretation'>", interp, "</div>"))
     html <- c(html, paste0("<div class='plot-container'><img src='", get_png_path("09_multi_pca_plot.pdf"), "' alt='PCA Plot' style='max-width:600px;'></div>"))
@@ -147,19 +169,27 @@ generate_html_report <- function(output_dir) {
     html <- c(html, "<div class='interpretation'>The chart below shows the variables that contribute most to PC1 and PC2. Bar direction indicates the sign of the loading; absolute length reflects contribution magnitude.</div>")
     html <- c(html, paste0("<div class='plot-container'><img src='", get_png_path("09_multi_pca_top_loadings_PC1_PC2_plot.pdf"), "' alt='PCA Top Loadings Bar Chart' style='max-width:800px;'></div>"))
 
-    html <- c(html, "<h3>Post-hoc tests per PC axis</h3>", df_to_html_table(pca_posthoc))
+    html <- c(html, "<h3>Post-hoc tests per PC axis (P_BH = Benjamini-Hochberg corrected)</h3>", df_to_html_table(pca_posthoc))
 
     pca_loadings <- read_csv_safe("09_multi_pca_top_loadings_PC1_PC2.csv")
     if (!is.null(pca_loadings)) {
       html <- c(html, "<h3>Top loadings data table</h3>", df_to_html_table(pca_loadings))
     }
+
+    hull_tbl <- read_csv_safe("09_multi_pca_hull_areas.csv")
+    if (!is.null(hull_tbl) && nrow(hull_tbl) > 0) {
+      html <- c(html, "<h3>Convex hull areas in PCA morphospace (observed + bootstrap CI)</h3>")
+      interp_hull <- "Convex hull area quantifies the extent of morphospace occupied by each species on PC1&ndash;PC2. Bootstrapped 95% confidence intervals (seed-fixed) indicate estimate stability; non-overlapping intervals suggest species differ in morphospace breadth."
+      html <- c(html, paste0("<div class='interpretation'>", interp_hull, "</div>"))
+      html <- c(html, df_to_html_table(hull_tbl))
+    }
     html <- c(html, "</div>")
   }
 
-  # ---- 5. DAPC ----
+  # ---- 6. DAPC ----
   dapc_metrics <- read_csv_safe("11_multi_dapc_performance_metrics.csv")
   if (!is.null(dapc_metrics)) {
-    html <- c(html, "<div class='section'>", "<h2>5. Discriminant Analysis of Principal Components (DAPC)</h2>")
+    html <- c(html, "<div class='section'>", "<h2>6. Discriminant Analysis of Principal Components (DAPC)</h2>")
 
     mean_sens <- mean(dapc_metrics$Sensitivity, na.rm = TRUE)
     mean_spec <- mean(dapc_metrics$Specificity, na.rm = TRUE)
@@ -184,18 +214,55 @@ generate_html_report <- function(output_dir) {
     if (!is.null(conf_tbl)) {
       html <- c(html, "<h3>Confusion matrix</h3>", df_to_html_table(conf_tbl))
     }
+
+    dapc_cv_summary <- read_csv_safe("11_multi_dapc_cv_summary.csv")
+    if (!is.null(dapc_cv_summary) && nrow(dapc_cv_summary) > 0) {
+      html <- c(html, "<h3>Cross-validated classification (k-fold, seed-fixed)</h3>")
+      cv_acc <- dapc_cv_summary$Overall_accuracy[1]
+      if (!is.na(cv_acc) && cv_acc >= 0.8) {
+        cv_interp <- paste0("Cross-validation with ", dapc_cv_summary$K_folds_effective[1], " folds yielded an overall accuracy of <strong>", round(cv_acc * 100, 1), "%</strong>. This confirms that DAPC assignments are robust and not driven by overfitting.")
+      } else if (!is.na(cv_acc)) {
+        cv_interp <- paste0("Cross-validation yielded an overall accuracy of <strong>", round(cv_acc * 100, 1), "%</strong>, which is lower than the resubstitution metrics above &mdash; a sign that some discrimination may not generalize to new individuals.")
+      } else {
+        cv_interp <- "Cross-validation could not be completed for this dataset."
+      }
+      html <- c(html, paste0("<div class='interpretation'>", cv_interp, "</div>"))
+      html <- c(html, df_to_html_table(dapc_cv_summary))
+
+      cv_folds <- read_csv_safe("11_multi_dapc_cv_fold_results.csv")
+      if (!is.null(cv_folds) && nrow(cv_folds) > 0) {
+        html <- c(html, "<h3>Per-fold results (sensitivity by species)</h3>", df_to_html_table(cv_folds))
+      }
+      cv_species <- read_csv_safe("11_multi_dapc_cv_per_species.csv")
+      if (!is.null(cv_species) && nrow(cv_species) > 0) {
+        html <- c(html, "<h3>Cross-validated sensitivity by species</h3>", df_to_html_table(cv_species))
+      }
+      cv_conf <- read_csv_safe("11_multi_dapc_cv_confusion_matrix.csv")
+      if (!is.null(cv_conf) && nrow(cv_conf) > 0) {
+        html <- c(html, "<h3>Cross-validated confusion matrix</h3>", df_to_html_table(cv_conf))
+      }
+    }
+
+    var_importance <- read_csv_safe("11_multi_dapc_variable_importance.csv")
+    if (!is.null(var_importance) && nrow(var_importance) > 0) {
+      html <- c(html, "<h3>Variable contributions to discriminant axes</h3>")
+      top_var <- head(var_importance$variable, 3)
+      vi_interp <- paste0("Variables most influential in discriminating among species: <strong>", paste(top_var, collapse = ", "), "</strong>. Importance is the relative contribution of each variable across the retained discriminant axes (summing to 1).")
+      html <- c(html, paste0("<div class='interpretation'>", vi_interp, "</div>"))
+      html <- c(html, df_to_html_table(var_importance))
+    }
     html <- c(html, "</div>")
   }
 
   # ---- 6. Univariate Analyses (Parametric) ----
   anova_res <- read_csv_safe("12_uni_anova_summary.csv")
   if (!is.null(anova_res) && nrow(anova_res) > 0) {
-    html <- c(html, "<div class='section'>", "<h2>6. Univariate Analyses (Parametric)</h2>")
-    sig_vars <- anova_res[!is.na(anova_res$P_value) & anova_res$P_value < 0.05 & anova_res$Assumptions_Met == "Yes", "Variable"]
+    html <- c(html, "<div class='section'>", "<h2>7. Univariate Analyses (Parametric)</h2>")
+    sig_vars <- anova_res[!is.na(anova_res$P_BH) & anova_res$P_BH < 0.05 & anova_res$Assumptions_Met == "Yes", "Variable"]
     if (length(sig_vars) > 0) {
-      interp <- paste0("The following variables met normality/variance assumptions and show <strong>significant parametric differences</strong> (ANOVA p &lt; 0.05) among species: <strong>", paste(sig_vars, collapse = ", "), "</strong>. Pairwise differences are indicated by the lowercase letters on the plots (boxes sharing a letter do not significantly differ).")
+      interp <- paste0("The following variables met assumptions and show <strong>significant parametric differences</strong> (FDR-adjusted <em>P_BH</em> &lt; 0.05): <strong>", paste(sig_vars, collapse = ", "), "</strong>. Effect sizes &mdash; omega-squared and pairwise Cohen's d &mdash; are provided: |d| = 0.2/0.5/0.8 indicate small/medium/large effects. Pairwise differences are indicated by lowercase letters on the plots (boxes sharing a letter do not significantly differ).")
     } else {
-      interp <- "No variables showed significant parametric differences between species, or variables failed ANOVA assumptions."
+      interp <- "No variables showed significant parametric differences between species (after FDR correction), or variables failed ANOVA assumptions."
     }
     html <- c(html, paste0("<div class='interpretation'>", interp, "</div>"))
     html <- c(html, "<h3>ANOVA summary table</h3>", df_to_html_table(anova_res))
@@ -213,10 +280,10 @@ generate_html_report <- function(output_dir) {
   # ---- 7. Univariate Analyses (Non-Parametric) ----
   kw_res <- read_csv_safe("13_uni_kruskalwallis_summary.csv")
   if (!is.null(kw_res) && nrow(kw_res) > 0) {
-    html <- c(html, "<div class='section'>", "<h2>7. Univariate Analyses (Non-Parametric)</h2>")
-    sig_vars <- kw_res[!is.na(kw_res$Kruskal_p_value) & kw_res$Kruskal_p_value < 0.05, "Variable"]
+    html <- c(html, "<div class='section'>", "<h2>8. Univariate Analyses (Non-Parametric)</h2>")
+    sig_vars <- kw_res[!is.na(kw_res$P_BH) & kw_res$P_BH < 0.05, "Variable"]
     if (length(sig_vars) > 0) {
-      interp <- paste0("The following variables did not meet ANOVA assumptions, but show <strong>significant non-parametric differences</strong> (Kruskal-Wallis p &lt; 0.05): <strong>", paste(sig_vars, collapse = ", "), "</strong>. Pairwise differences are indicated by lowercase letters.")
+      interp <- paste0("The following variables did not meet ANOVA assumptions, but show <strong>significant non-parametric differences</strong> (FDR-adjusted <em>P_BH</em> &lt; 0.05): <strong>", paste(sig_vars, collapse = ", "), "</strong>. Effect sizes &mdash; epsilon-squared (0.01/0.06/0.14 = small/medium/large) and pairwise Dunn's r &mdash; are provided. Pairwise differences are indicated by lowercase letters.")
     } else {
       interp <- "No variables analyzed non-parametrically showed significant differences."
     }
@@ -236,7 +303,7 @@ generate_html_report <- function(output_dir) {
   # ---- 8. Categorical Variable Analyses ----
   cat_res <- read_csv_safe("14_categorical_analysis_summary.csv")
   if (!is.null(cat_res) && nrow(cat_res) > 0) {
-    html <- c(html, "<div class='section'>", "<h2>8. Categorical Variable Analyses</h2>")
+    html <- c(html, "<div class='section'>", "<h2>9. Categorical Variable Analyses</h2>")
 
     sig_cat <- cat_res[!is.na(cat_res$P_value) & cat_res$P_value < 0.05, "Variable"]
     if (length(sig_cat) > 0) {

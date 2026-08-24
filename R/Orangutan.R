@@ -350,10 +350,10 @@ find_and_plot_nonoverlaps <- function(df, output_dir, custom_colors,
       sp1_min   = numeric(0),
       sp1_max   = numeric(0),
       sp2_min   = numeric(0),
-      sp2_max   = numeric(0),
-      overlap   = logical(0)
+      sp2_max   = numeric(0)
     )
   }
+  non_overlapping_pairs$overlap <- NULL
 
   write.csv(non_overlapping_pairs, file.path(output_dir, "07_nonoverlaps_list.csv"), row.names = FALSE)
 
@@ -413,6 +413,52 @@ find_and_plot_nonoverlaps <- function(df, output_dir, custom_colors,
   }
 
   invisible(non_overlapping_pairs)
+}
+
+# ----------------- Pairwise overlap coefficients -----------------
+compute_overlap_coefficients <- function(df, output_dir) {
+  numeric_vars <- colnames(df)[sapply(df, is.numeric)]
+  species_list <- sort(unique(as.character(df$species)))
+  if (length(species_list) < 2 || length(numeric_vars) == 0) {
+    ovl_empty <- data.frame(species_1 = character(0), species_2 = character(0), variable = character(0), n1 = integer(0), n2 = integer(0), overlap_coefficient = numeric(0))
+    write.csv(ovl_empty, file = file.path(output_dir, "07_overlap_coefficients.csv"), row.names = FALSE)
+    return(invisible(ovl_empty))
+  }
+
+  ovl <- data.frame()
+  for (var in numeric_vars) {
+    for (i in seq_len(length(species_list) - 1)) {
+      for (j in seq.int(i + 1, length(species_list))) {
+        sp1 <- species_list[i]
+        sp2 <- species_list[j]
+        vals1 <- na.omit(df[[var]][df$species == sp1])
+        vals2 <- na.omit(df[[var]][df$species == sp2])
+        if (length(vals1) < 2 || length(vals2) < 2) next
+
+        lo <- min(c(vals1, vals2), na.rm = TRUE)
+        hi <- max(c(vals1, vals2), na.rm = TRUE)
+        if (isTRUE(all.equal(lo, hi))) {
+          ovl_val <- 1
+        } else {
+          n_grid <- 512
+          d1 <- density(vals1, from = lo, to = hi, n = n_grid)
+          d2 <- density(vals2, from = lo, to = hi, n = n_grid)
+          ovl_val <- sum(pmin(d1$y, d2$y)) * (d1$x[2] - d1$x[1])
+        }
+        ovl <- rbind(ovl, data.frame(
+          species_1 = sp1,
+          species_2 = sp2,
+          variable = var,
+          overlap_coefficient = round(ovl_val, 4),
+          n1 = length(vals1),
+          n2 = length(vals2),
+          stringsAsFactors = FALSE
+        ))
+      }
+    }
+  }
+  write.csv(ovl, file = file.path(output_dir, "07_overlap_coefficients.csv"), row.names = FALSE)
+  invisible(ovl)
 }
 
 # ----------------- Multivariate tests (beta-dispersion & PERMANOVA) -----------------
@@ -731,7 +777,7 @@ pca_posthoc_tests <- function(pca_obj, pca_df, output_dir) {
     return(NULL)
   }
 
-  pca_posthoc_table <- data.frame(PC = character(), Test = character(), Statistic = numeric(), DF = character(), P_value = numeric(), Significant_Pairs = character(), stringsAsFactors = FALSE)
+  pca_posthoc_table <- data.frame(PC = character(), Test = character(), Statistic = numeric(), DF = character(), P_value = numeric(), Significant_Pairs = character(), P_BH = numeric(), stringsAsFactors = FALSE)
 
   for (pc in pcs_to_test) {
     pc_name <- paste0("PC", pc)
@@ -753,7 +799,7 @@ pca_posthoc_tests <- function(pca_obj, pca_df, output_dir) {
         tuk <- TukeyHSD(fit)[[1]]
         sig_pairs <- extract_significant_tukey_pairs(tuk)
       }
-      pca_posthoc_table <- rbind(pca_posthoc_table, data.frame(PC = pc_name, Test = "ANOVA + Tukey", Statistic = stat, DF = df, P_value = p_val, Significant_Pairs = sig_pairs, stringsAsFactors = FALSE))
+      pca_posthoc_table <- rbind(pca_posthoc_table, data.frame(PC = pc_name, Test = "ANOVA + Tukey", Statistic = stat, DF = df, P_value = p_val, Significant_Pairs = sig_pairs, P_BH = NA_real_, stringsAsFactors = FALSE))
     } else {
       kw <- kruskal.test(scores ~ groups)
       sig_pairs <- "None"
@@ -761,12 +807,65 @@ pca_posthoc_tests <- function(pca_obj, pca_df, output_dir) {
         dunn <- dunn.test::dunn.test(scores, groups, method = "bonferroni", kw = FALSE, label = TRUE)
         sig_pairs <- extract_significant_dunn_pairs(dunn)
       }
-      pca_posthoc_table <- rbind(pca_posthoc_table, data.frame(PC = pc_name, Test = "Kruskal-Wallis + Dunn", Statistic = as.numeric(kw$statistic), DF = as.character(kw$parameter), P_value = kw$p.value, Significant_Pairs = sig_pairs, stringsAsFactors = FALSE))
+      pca_posthoc_table <- rbind(pca_posthoc_table, data.frame(PC = pc_name, Test = "Kruskal-Wallis + Dunn", Statistic = as.numeric(kw$statistic), DF = as.character(kw$parameter), P_value = kw$p.value, Significant_Pairs = sig_pairs, P_BH = NA_real_, stringsAsFactors = FALSE))
     }
   }
 
+  pca_posthoc_table$P_BH <- NA_real_
+  ok_p <- !is.na(pca_posthoc_table$P_value)
+  pca_posthoc_table$P_BH[ok_p] <- p.adjust(pca_posthoc_table$P_value[ok_p], method = "BH")
+
   write.csv(pca_posthoc_table, file = file.path(output_dir, "09_multi_pca_posthoc.csv"), row.names = FALSE)
   pca_posthoc_table
+}
+
+# ----------------- Morphospace hull areas (PCA space) -----------------
+polygon_area <- function(x, y) {
+  if (length(x) < 3 || any(is.na(x)) || any(is.na(y))) return(NA_real_)
+  n <- length(x)
+  x <- c(x, x[1])
+  y <- c(y, y[1])
+  0.5 * abs(sum(x[seq_len(n)] * y[seq_len(n) + 1]) - sum(y[seq_len(n)] * x[seq_len(n) + 1]))
+}
+
+compute_pca_hull_areas <- function(pca_df, output_dir, B = 999, seed = NULL) {
+  if (is.null(pca_df) || nrow(pca_df) < 3 ||
+    !all(c("PC1", "PC2", "species") %in% colnames(pca_df))) {
+    hull_table <- data.frame(species = character(0), n = integer(0), hull_area = numeric(0), hull_area_CI_low = numeric(0), hull_area_CI_high = numeric(0), stringsAsFactors = FALSE)
+    write.csv(hull_table, file = file.path(output_dir, "09_multi_pca_hull_areas.csv"), row.names = FALSE)
+    return(invisible(hull_table))
+  }
+
+  species_list <- sort(unique(as.character(pca_df$species)))
+  rows <- list()
+  for (sp in species_list) {
+    sub <- pca_df[as.character(pca_df$species) == sp, , drop = FALSE]
+    sub <- sub[!is.na(sub$PC1) & !is.na(sub$PC2), , drop = FALSE]
+    n <- nrow(sub)
+    if (n < 3) next
+    h_idx <- chull(sub$PC1, sub$PC2)
+    area <- polygon_area(sub$PC1[h_idx], sub$PC2[h_idx])
+
+    boot_areas <- withr::with_seed(seed, {
+      vapply(seq_len(B), function(b) {
+        idx <- sample(seq_len(n), size = n, replace = TRUE)
+        hb <- chull(sub$PC1[idx], sub$PC2[idx])
+        polygon_area(sub$PC1[idx][hb], sub$PC2[idx][hb])
+      }, numeric(1))
+    })
+    ci <- quantile(boot_areas, probs = c(0.025, 0.975), na.rm = TRUE)
+    rows[[length(rows) + 1]] <- data.frame(
+      species = sp,
+      n = n,
+      hull_area = round(area, 4),
+      hull_area_CI_low = round(unname(ci[1]), 4),
+      hull_area_CI_high = round(unname(ci[2]), 4),
+      stringsAsFactors = FALSE
+    )
+  }
+  hull_table <- if (length(rows) > 0) dplyr::bind_rows(rows) else data.frame(species = character(0), n = integer(0), hull_area = numeric(0), hull_area_CI_low = numeric(0), hull_area_CI_high = numeric(0), stringsAsFactors = FALSE)
+  write.csv(hull_table, file = file.path(output_dir, "09_multi_pca_hull_areas.csv"), row.names = FALSE)
+  invisible(hull_table)
 }
 
 # ----------------- DAPC -----------------
@@ -832,6 +931,23 @@ dapc_analysis <- function(df, output_dir, custom_colors = NULL, species_to_encir
     var_explained <- c(1, 0)
   } else {
     var_explained <- eigenvalues[1:2] / sum(eigenvalues)
+  }
+
+  # Variable contribution to discriminant axes (character importance)
+  if (!is.null(dapc_result$var.contr) && is.matrix(dapc_result$var.contr)) {
+    vc <- dapc_result$var.contr
+    importance <- rowSums(abs(vc), na.rm = TRUE)
+    importance <- importance / sum(importance)
+    var_importance <- data.frame(
+      variable = names(importance),
+      importance = round(importance, 4),
+      stringsAsFactors = FALSE
+    )
+    var_importance <- var_importance[order(-var_importance$importance), , drop = FALSE]
+    write.csv(var_importance,
+      file = file.path(output_dir, "11_multi_dapc_variable_importance.csv"),
+      row.names = FALSE
+    )
   }
 
   # polygons
@@ -905,6 +1021,120 @@ dapc_analysis <- function(df, output_dir, custom_colors = NULL, species_to_encir
   list(dapc = dapc_result, LD_scores = LD_scores, confusion = conf_table, metrics = dapc_metrics, misclassified = misclassified)
 }
 
+# ----------------- DAPC k-fold cross-validation -----------------
+dapc_kfold_cv <- function(df, output_dir, k = 10, seed = NULL, verbose = FALSE) {
+  if (is.null(k) || is.na(k) || k < 2) {
+    return(invisible(NULL))
+  }
+
+  df$species <- factor(df$species, levels = sort(unique(as.character(df$species))))
+  numeric_idx <- sapply(df, is.numeric)
+  variables_df <- df[, numeric_idx, drop = FALSE]
+  vars_ok <- sapply(variables_df, function(x) {
+    !all(is.na(x)) && length(unique(na.omit(x))) > 1
+  })
+  variables_df <- variables_df[, vars_ok, drop = FALSE]
+  variables_matrix <- as.matrix(variables_df)
+  grp <- df$species
+  levels_grp <- levels(grp)
+  n_groups <- length(levels_grp)
+  if (ncol(variables_matrix) < 1 || n_groups < 2 || nrow(variables_matrix) <= n_groups) {
+    return(invisible(NULL))
+  }
+
+  k_eff <- min(k, min(table(grp)))
+  if (k_eff < 2) return(invisible(NULL))
+
+  fold_assign <- withr::with_seed(seed, {
+    fa <- integer(nrow(variables_matrix))
+    for (sp in levels_grp) {
+      idx_sp <- which(grp == sp)
+      fa[idx_sp] <- sample(rep(seq_len(k_eff), length.out = length(idx_sp)))
+    }
+    fa
+  })
+
+  max_n_pca <- min(ncol(variables_matrix), max(1, nrow(variables_matrix) - n_groups))
+  if (max_n_pca < 1) max_n_pca <- 1
+
+  fold_rows <- data.frame()
+  fold_acc <- numeric(k_eff)
+  overall_conf <- matrix(0, nrow = n_groups, ncol = n_groups,
+                         dimnames = list(levels_grp, levels_grp))
+
+  for (f in seq_len(k_eff)) {
+    train_idx <- which(fold_assign != f)
+    test_idx  <- which(fold_assign == f)
+    if (length(test_idx) == 0 || length(unique(grp[train_idx])) < 2) next
+
+    dapc_cv <- tryCatch(
+      withr::with_seed(seed, adegenet::dapc(
+        variables_matrix[train_idx, , drop = FALSE],
+        grp = grp[train_idx],
+        n.pca = max_n_pca,
+        n.da = max(1, n_groups - 1)
+      )),
+      error = function(e) NULL
+    )
+    if (is.null(dapc_cv)) next
+
+    pred <- tryCatch(
+      adegenet::predict.dapc(dapc_cv, newdata = variables_matrix[test_idx, , drop = FALSE]),
+      error = function(e) NULL
+    )
+    if (is.null(pred)) next
+
+    pred_lbl <- as.character(pred$assign)
+    true_lbl <- as.character(grp[test_idx])
+    fold_acc[f] <- mean(pred_lbl == true_lbl)
+
+    for (i in seq_along(test_idx)) {
+      overall_conf[true_lbl[i], pred_lbl[i]] <- overall_conf[true_lbl[i], pred_lbl[i]] + 1
+    }
+
+    for (sp in levels_grp) {
+      idx_sp <- which(true_lbl == sp)
+      if (length(idx_sp) > 0) {
+        fold_rows <- rbind(fold_rows, data.frame(
+          Fold = f, Species = sp, N_test = length(idx_sp),
+          Sensitivity_fold = round(mean(pred_lbl[idx_sp] == sp), 4),
+          stringsAsFactors = FALSE
+        ))
+      }
+    }
+    if (verbose) message(sprintf("DAPC CV fold %d/%d: accuracy = %.3f", f, k_eff, fold_acc[f]))
+  }
+
+  if (nrow(fold_rows) > 0) {
+    fold_rows$N_train <- nrow(variables_matrix) - fold_rows$N_test
+    write.csv(fold_rows, row.names = FALSE, file = file.path(output_dir, "11_multi_dapc_cv_fold_results.csv"))
+  }
+
+  folds_used <- fold_acc != 0
+  overall_acc <- sum(diag(overall_conf)) / max(1, sum(overall_conf))
+  per_species <- data.frame(
+    Species = levels_grp,
+    Sensitivity_CV = vapply(levels_grp, function(sp) {
+      tot <- sum(overall_conf[sp, ])
+      if (tot == 0) NA_real_ else round(overall_conf[sp, sp] / tot, 4)
+    }, numeric(1)),
+    stringsAsFactors = FALSE
+  )
+  cv_metrics <- data.frame(
+    K_folds_effective = k_eff,
+    Folds_completed = sum(folds_used),
+    Overall_accuracy = round(overall_acc, 4),
+    Mean_fold_accuracy = round(mean(fold_acc[folds_used]), 4),
+    stringsAsFactors = FALSE
+  )
+
+  write.csv(cv_metrics, row.names = FALSE, file = file.path(output_dir, "11_multi_dapc_cv_summary.csv"))
+  write.csv(overall_conf, row.names = TRUE, file = file.path(output_dir, "11_multi_dapc_cv_confusion_matrix.csv"))
+  write.csv(per_species, row.names = FALSE, file = file.path(output_dir, "11_multi_dapc_cv_per_species.csv"))
+
+  if (verbose) message(sprintf("DAPC CV done: %d-fold, overall accuracy = %.3f", k_eff, overall_acc))
+  invisible(list(summary = cv_metrics, folds = fold_rows, confusion = overall_conf, per_species = per_species))
+}
 # ----------------- Univariate tests (ANOVA / Tukey; Kruskal / Dunn) -----------------
 generate_label_df_from_tukey <- function(tukey_mat, species_levels = NULL) {
   if (is.null(tukey_mat)) {
@@ -965,7 +1195,7 @@ univariate_analyses <- function(df, output_dir, custom_colors = NULL,
   univariate_theme <- univariate_theme_fn(label_aes)
 
   failed_anova_assumptions <- character(0)
-  anova_results_table <- data.frame(Variable = character(), F_value = numeric(), DF_between = numeric(), DF_within = numeric(), P_value = numeric(), Shapiro_p = numeric(), Bartlett_p = numeric(), Assumptions_Met = character(), Significant_Pairs = character(), stringsAsFactors = FALSE)
+  anova_results_table <- data.frame(Variable = character(), F_value = numeric(), DF_between = numeric(), DF_within = numeric(), P_value = numeric(), Shapiro_p = numeric(), Bartlett_p = numeric(), Assumptions_Met = character(), Significant_Pairs = character(), Omega2 = numeric(), Cohen_d = character(), P_BH = numeric(), stringsAsFactors = FALSE)
   TUKEY <- list()
 
   check_anova_assumptions <- function(data, variable) {
@@ -986,10 +1216,22 @@ univariate_analyses <- function(df, output_dir, custom_colors = NULL,
     df_within <- a_sum[["Df"]][2]
     p_value <- a_sum[["Pr(>F)"]][1]
 
+    ms_error <- a_sum[["Mean Sq"]][2]
+    ss_effect <- a_sum[["Sum Sq"]][1]
+    ss_error <- a_sum[["Sum Sq"]][2]
+    omega2 <- if (!is.na(ss_effect) && !is.na(ss_error) &&
+      !is.na(df_between) && !is.na(ms_error) && ms_error > 0) {
+      (ss_effect - (df_between * ms_error)) / (ss_effect + ss_error + ms_error)
+    } else {
+      NA_real_
+    }
+    if (!is.na(omega2) && omega2 < 0) omega2 <- 0
+
     assumptions_met <- !is.na(shapiro_p) && shapiro_p > 0.05 && !is.na(bartlett_p) && bartlett_p > 0.05
     if (!assumptions_met) failed_anova_assumptions <<- unique(c(failed_anova_assumptions, variable))
 
     sig_pairs <- NA_character_
+    cohen_d <- NA_character_
     if (assumptions_met && !is.na(p_value) && p_value < 0.05) {
       tuk <- tryCatch(TukeyHSD(anova_result, "species"), error = function(e) NULL)
       if (!is.null(tuk) && !is.null(tuk[["species"]])) {
@@ -999,14 +1241,31 @@ univariate_analyses <- function(df, output_dir, custom_colors = NULL,
           sig_pairs <- paste(rownames(tuk[["species"]])[tuk[["species"]][, pcol] < 0.05], collapse = "; ")
           if (nchar(sig_pairs) == 0) sig_pairs <- "None"
         }
+        if (!is.null(sig_pairs) && sig_pairs != "None" && !is.na(ms_error) && ms_error > 0) {
+          grp_means <- suppressWarnings(tapply(data[[variable]], data$species, mean, na.rm = TRUE))
+          d_vals <- vapply(rownames(tuk[["species"]]), function(comp) {
+            parts <- trimws(unlist(strsplit(comp, "-")))
+            if (length(parts) != 2 || !all(parts %in% names(grp_means))) return(NA_real_)
+            (grp_means[[parts[1]]] - grp_means[[parts[2]]]) / sqrt(ms_error)
+          }, numeric(1))
+          sig_comps <- rownames(tuk[["species"]])[tuk[["species"]][, pcol] < 0.05]
+          keep <- sig_comps[!is.na(d_vals[sig_comps])]
+          if (length(keep) > 0) {
+            cohen_d <- paste0(keep, ": ", formatC(round(d_vals[keep], 2), format = "f", digits = 2), collapse = "; ")
+          }
+        }
       }
     }
 
-    anova_results_table <<- rbind(anova_results_table, data.frame(Variable = variable, F_value = f_statistic, DF_between = df_between, DF_within = df_within, P_value = p_value, Shapiro_p = shapiro_p, Bartlett_p = bartlett_p, Assumptions_Met = ifelse(assumptions_met, "Yes", "No"), Significant_Pairs = sig_pairs, stringsAsFactors = FALSE))
+    anova_results_table <<- rbind(anova_results_table, data.frame(Variable = variable, F_value = f_statistic, DF_between = df_between, DF_within = df_within, P_value = p_value, Shapiro_p = shapiro_p, Bartlett_p = bartlett_p, Assumptions_Met = ifelse(assumptions_met, "Yes", "No"), Significant_Pairs = sig_pairs, Omega2 = round(omega2, 4), Cohen_d = cohen_d, P_BH = NA_real_, stringsAsFactors = FALSE))
   }
 
   variable_names <- names(df)[sapply(df, is.numeric)]
   for (variable in variable_names) check_anova_assumptions(df, variable)
+  anova_results_table$P_BH <- NA_real_
+  ok_p <- !is.na(anova_results_table$P_value)
+  anova_results_table$P_BH[ok_p] <- p.adjust(anova_results_table$P_value[ok_p], method = "BH")
+  anova_results_table <- anova_results_table[order(anova_results_table$P_value), ]
   write.csv(anova_results_table, file = file.path(output_dir, "12_uni_anova_summary.csv"), row.names = FALSE)
 
   # Plot ANOVA-passing variables
@@ -1114,26 +1373,45 @@ univariate_analyses <- function(df, output_dir, custom_colors = NULL,
     paste(dunn_test$comparisons[sig], collapse = "; ")
   }
 
-  summary_table <- data.frame(Variable = character(), Kruskal_p_value = numeric(), Kruskal_Chi_Squared = numeric(), Significant_Pairs = character(), stringsAsFactors = FALSE)
+  summary_table <- data.frame(Variable = character(), Kruskal_p_value = numeric(), Kruskal_Chi_Squared = numeric(), Significant_Pairs = character(), Epsilon2 = numeric(), Dunn_r = character(), P_BH = numeric(), stringsAsFactors = FALSE)
   dunn_labels_list <- list()
 
   for (var in failed_anova_assumptions) {
     kruskal_test <- tryCatch(kruskal.test(as.formula(paste(var, "~ species")), data = df), error = function(e) NULL)
     if (is.null(kruskal_test)) {
-      summary_table <- rbind(summary_table, data.frame(Variable = var, Kruskal_p_value = NA, Kruskal_Chi_Squared = NA, Significant_Pairs = "Error", stringsAsFactors = FALSE))
+      summary_table <- rbind(summary_table, data.frame(Variable = var, Kruskal_p_value = NA, Kruskal_Chi_Squared = NA, Significant_Pairs = "Error", Epsilon2 = NA, Dunn_r = NA, P_BH = NA, stringsAsFactors = FALSE))
       next
     }
     sig_pairs <- NA_character_
+    dunn_r_str <- NA_character_
+    n_total <- sum(!is.na(df[[var]]))
+    n_groups_k <- length(unique(na.omit(df$species)))
+    epsilon2 <- if (!is.na(kruskal_test$statistic) && n_total > n_groups_k && !is.na(kruskal_test$statistic)) {
+      max(0, (as.numeric(kruskal_test$statistic) - n_groups_k + 1) / (n_total - n_groups_k))
+    } else NA_real_
     if (kruskal_test$p.value < 0.05) {
       dunn_test <- tryCatch(dunn.test::dunn.test(df[[var]], df$species, method = "bonferroni", kw = FALSE, label = TRUE), error = function(e) NULL)
       if (!is.null(dunn_test)) {
         dunn_labels_list[[var]] <- generate_dunn_label_df(dunn_test, species_levels = names(custom_colors))
         sig_pairs <- extract_significant_dunn_pairs(dunn_test)
+        if (!is.null(dunn_test$Z) && !is.null(dunn_test$comparisons) && n_total > 0) {
+          pvals_d <- if (!is.null(dunn_test$P.adjusted)) dunn_test$P.adjusted else if (!is.null(dunn_test$P.adj)) dunn_test$P.adj else rep(NA, length(dunn_test$Z))
+          sigin <- which(pvals_d < 0.05)
+          if (length(sigin) > 0) {
+            dunn_r_str <- paste0(dunn_test$comparisons[sigin], ": ", formatC(round(abs(dunn_test$Z[sigin]) / sqrt(n_total), 2), format = "f", digits = 2), collapse = "; ")
+          } else {
+            dunn_r_str <- "None"
+          }
+        }
       }
     }
-    summary_table <- rbind(summary_table, data.frame(Variable = var, Kruskal_p_value = kruskal_test$p.value, Kruskal_Chi_Squared = as.numeric(kruskal_test$statistic), Significant_Pairs = sig_pairs, stringsAsFactors = FALSE))
+    summary_table <- rbind(summary_table, data.frame(Variable = var, Kruskal_p_value = kruskal_test$p.value, Kruskal_Chi_Squared = as.numeric(kruskal_test$statistic), Significant_Pairs = sig_pairs, Epsilon2 = round(epsilon2, 4), Dunn_r = dunn_r_str, P_BH = NA_real_, stringsAsFactors = FALSE))
   }
 
+  summary_table$P_BH <- NA_real_
+  ok_p <- !is.na(summary_table$Kruskal_p_value)
+  summary_table$P_BH[ok_p] <- p.adjust(summary_table$Kruskal_p_value[ok_p], method = "BH")
+  summary_table <- summary_table[order(summary_table$Kruskal_p_value), ]
   write.csv(summary_table, file = file.path(output_dir, "13_uni_kruskalwallis_summary.csv"), row.names = FALSE)
 
   # Plot KW variables
@@ -1382,10 +1660,14 @@ capture_run_config <- function(args) {
 #' @param box_aes List of boxplot aesthetics
 #' @param label_aes List of label/text aesthetics
 #' @param label_templates Optional plot label templates
+#' @param dapc_cv_k Number of folds for DAPC cross-validation (default: 10; use 0 or 1 to skip).
+#' @param hull_boot_B Number of bootstrap resamples for PCA hull-area confidence intervals (default: 999).
 #' @param seeds A named list of integer seeds for reproducibility, with elements:
-#'   \code{betadisper} for beta-dispersion permutation tests and
-#'   \code{permanova} for PERMANOVA permutation tests.
-#'   Defaults to \code{list(betadisper = 123, permanova = 456)}.
+#'   \code{betadisper} for beta-dispersion permutation tests,
+#'   \code{permanova} for PERMANOVA permutation tests,
+#'   \code{hull} for PCA hull-area bootstraps, and
+#'   \code{dapc_cv} for DAPC cross-validation fold assignment.
+#'   Defaults to \code{list(betadisper = 123, permanova = 456, hull = 123, dapc_cv = 789)}.
 #' @param verbose Logical; if TRUE, print progress messages. Defaults to FALSE.
 #' @return A list containing results from all analyses
 #'
@@ -1433,7 +1715,7 @@ run_orangutan <- function(data_path,
                           palette_name = "Paired",
                           custom_colors = NULL,
                           species_to_encircle = character(0),
-                          seeds = list(betadisper = 123, permanova = 456),
+                          seeds = list(betadisper = 123, permanova = 456, hull = 123, dapc_cv = 789),
                           # plotting customization:
                           point_aes = list(
                             point_size = 3.5, jitter_width = 0.1, jitter_alpha = 0.8,
@@ -1450,6 +1732,8 @@ run_orangutan <- function(data_path,
                             title_size = 12, label_offset = 0.05
                           ),
                           label_templates = NULL,
+                          dapc_cv_k = 10,
+                          hull_boot_B = 999,
                           verbose = FALSE) {
   ## ---- Seed validation ----
   if (!is.null(seeds)) {
@@ -1457,7 +1741,7 @@ run_orangutan <- function(data_path,
       stop("`seeds` must be a named list or NULL.")
     }
 
-    allowed <- c("betadisper", "permanova")
+    allowed <- c("betadisper", "permanova", "hull", "dapc_cv")
     bad <- setdiff(names(seeds), allowed)
     if (length(bad) > 0) {
       stop("Invalid seed names: ", paste(bad, collapse = ", "))
@@ -1538,11 +1822,21 @@ run_orangutan <- function(data_path,
       paste("- PERMANOVA permutations: 999"),
       paste("- Beta-dispersion seed:", ifelse(is.null(seeds$betadisper), "None", seeds$betadisper)),
       paste("- PERMANOVA seed:", ifelse(is.null(seeds$permanova), "None", seeds$permanova)),
+      paste("- PCA hull-area bootstrap seed:", ifelse(is.null(seeds$hull), "None", seeds$hull)),
+      paste("- PCA hull-area bootstrap resamples:", hull_boot_B),
+      paste("- DAPC cross-validation seed:", ifelse(is.null(seeds$dapc_cv), "None", seeds$dapc_cv)),
+      paste("- DAPC cross-validation folds (`dapc_cv_k`):", dapc_cv_k),
+      paste("- FDR correction: Benjamini-Hochberg across univariate and PCA post-hoc tests (columns `P_BH`)"),
+      paste("- Effect sizes: omega-squared and Cohen's d (parametric); epsilon-squared and Dunn's r (non-parametric)"),
+      paste("- Overlap coefficients: kernel-density OVL (0 = no overlap, 1 = identical) for all species pairs"),
       paste("- Run timestamp:", format(Sys.time(), "%Y-%m-%d %H:%M:%S")),
       paste("- R version:", R.version.string),
       "",
       "Cite as:",
-      "Torres, J. (2026). Orangutan: An R Package for Analyzing and Visualizing Phenotypic Data in the Context of Species Descriptions and Population Comparisons. Ecology and Evolution, 16(2), e73111. https://doi.org/10.1002/ece3.73111"
+      "Torres, J. (2026). Orangutan: An R Package for Analyzing and Visualizing Phenotypic Data in the Context of Species Descriptions and Population Comparisons. Ecology and Evolution, 16(2), e73111. https://doi.org/10.1002/ece3.73111",
+      "",
+      "GitHub repository:",
+      "https://github.com/metalofis/Orangutan-R"
     ),
     file.path(output_dir, "00_methods_summary.txt")
   )
@@ -1559,8 +1853,10 @@ run_orangutan <- function(data_path,
   num_data_clean <- NULL
   removed_samples <- NULL
   mv_res <- NULL
+  ovl_res <- NULL
   pca_res <- NULL
   dapc_res <- NULL
+  dapc_cv_res <- NULL
 
   custom_colors <- build_palette(species_levels, palette_name = palette_name, custom_colors = user_colors)
   if (length(custom_colors) < length(species_levels)) {
@@ -1657,6 +1953,15 @@ run_orangutan <- function(data_path,
       verbose = verbose
     )
 
+    ## ---- overlap coefficients ----
+    ovl_res <- tryCatch(
+      compute_overlap_coefficients(num_data_clean, output_dir),
+      error = function(e) {
+        warning("Overlap coefficient analysis failed: ", e$message)
+        NULL
+      }
+    )
+
     ## ---- multivariate ----
     mv_res <- tryCatch(
       multivariate_tests(
@@ -1692,6 +1997,10 @@ run_orangutan <- function(data_path,
         pca_posthoc_tests(pca_res$pca, pca_res$pca_df, output_dir),
         error = function(e) warning("PCA post-hoc failed: ", e$message)
       )
+      tryCatch(
+        compute_pca_hull_areas(pca_res$pca_df, output_dir, B = hull_boot_B, seed = seeds$hull),
+        error = function(e) warning("PCA hull-area analysis failed: ", e$message)
+      )
     }
 
     ## ---- DAPC ----
@@ -1711,6 +2020,23 @@ run_orangutan <- function(data_path,
         NULL
       }
     )
+
+    ## ---- DAPC cross-validation ----
+    dapc_cv_res <- NULL
+    if (!is.null(dapc_res) && is.numeric(dapc_cv_k) && dapc_cv_k >= 2) {
+      dapc_cv_res <- tryCatch(
+        dapc_kfold_cv(
+          num_data_clean, output_dir,
+          k = dapc_cv_k,
+          seed = seeds$dapc_cv,
+          verbose = verbose
+        ),
+        error = function(e) {
+          warning("DAPC cross-validation failed: ", e$message)
+          NULL
+        }
+      )
+    }
 
     ## ---- univariate ----
     tryCatch(
@@ -1755,9 +2081,11 @@ run_orangutan <- function(data_path,
     data = data_clean,
     num_data = num_data_clean,
     removed_samples = removed_samples,
+    overlap_coefficients = ovl_res,
     multivariate = mv_res,
     pca = pca_res,
     dapc = dapc_res,
+    dapc_cv = dapc_cv_res,
     categorical = cat_res
   ))
 }

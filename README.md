@@ -37,6 +37,10 @@ Orangutan is an R package for analyzing and visualizing measurements (morphometr
     - `07_nonoverlaps_list.csv`
     - `07_nonoverlap_plot_<species1>_vs_<species2>_<variable>.pdf`
 
+- **Computes pairwise overlap coefficients (OVL)**  
+  Kernel-density overlap (0 = no overlap, 1 = identical) for every species pair and trait.
+    - `07_overlap_coefficients.csv`
+
 - **Runs multivariate tests on the full dataset**
   - Tests homogeneity of multivariate dispersion (beta-dispersion).
   - Runs PERMANOVA and flags results if dispersion assumptions are violated.
@@ -55,22 +59,37 @@ Orangutan is an R package for analyzing and visualizing measurements (morphometr
   - Tests PCA axes cumulatively explaining ~90% of variance.
   - Uses ANOVA + Tukey HSD when assumptions are met.
   - Falls back to Kruskal–Wallis + Dunn tests otherwise.
-  - Reports significant species differences per PC axis.
+  - Reports significant species differences per PC axis, with Benjamini-Hochberg FDR correction (`P_BH`).
     - `09_multi_pca_posthoc.csv`
+
+- **Quantifies morphospace occupation per species (convex hull areas)**
+  - Computes the convex hull area of each species on PC1–PC2, with seed-fixed bootstrap 95% CI (default 999 resamples).
+    - `09_multi_pca_hull_areas.csv`
 
 - **Runs Discriminant Analysis of Principal Components (DAPC)**
   - Produces discriminant plots.
   - Evaluates classification performance.
   - Reports misclassified individuals.
+  - Ranks variable contributions to the discriminant axes.
     - `10_multi_dapc_plot.pdf`
     - `11_multi_dapc_confusion_matrix.csv`
     - `11_multi_dapc_performance_metrics.csv`
     - `11_multi_dapc_misclassified_individuals.csv`
+    - `11_multi_dapc_variable_importance.csv`
+
+- **Cross-validates DAPC performance (k-fold)**
+  - Stratified k-fold CV (default 10 folds, `dapc_cv_k`; automatically reduced when sample sizes are small).
+  - Reports overall accuracy, per-fold and per-species sensitivity, and a pooled confusion matrix (seed-fixed).
+    - `11_multi_dapc_cv_summary.csv`
+    - `11_multi_dapc_cv_fold_results.csv`
+    - `11_multi_dapc_cv_per_species.csv`
+    - `11_multi_dapc_cv_confusion_matrix.csv`
 
 - **Performs univariate tests for each variable**
   - ANOVA + Tukey when parametric assumptions are met.
   - Kruskal–Wallis + Dunn when parametric assumptions fail.
   - Generates corresponding plots with significance lettering.
+  - Reports FDR-adjusted p-values (`P_BH`) and effect sizes (omega-squared + Cohen's d; epsilon-squared + Dunn's r).
     - `12_uni_anova_summary.csv`
     - `12_uni_anova_plot_<variable>.pdf`
     - `13_uni_kruskalwallis_summary.csv`
@@ -87,13 +106,13 @@ Orangutan is an R package for analyzing and visualizing measurements (morphometr
     - `14_categorical_barplot_<variable>.pdf`
 
 - **Ensures reproducibility**
-  - Saves all results, plots, configuration details, and methods summaries to `output_dir`.
-    - `00_methods_summary.txt` — human-readable methods summary alongside the exact R environment and call configurations.
+  - Saves all results, plots, and configuration to `output_dir`.
+    - `00_methods_summary.txt` — methods summary plus exact R environment and call configuration.
 
 - **Generates an HTML interpretation report**
   - Automatically produced at the end of every run.
   - Summarizes results in plain language with embedded plot thumbnails.
-  - Covers all analysis sections: diagnostic traits, PERMANOVA, PCA, DAPC, and univariate tests.
+  - Covers all analysis sections: diagnostic traits, overlap coefficients, PERMANOVA, PCA, hull areas, DAPC, DAPC cross-validation, univariate tests.
     - `orangutan_report.html`
 
 
@@ -104,7 +123,7 @@ Orangutan is an R package for analyzing and visualizing measurements (morphometr
 
 ### Stable version (CRAN)
 
-Install the latest stable release from CRAN (v2.1.0):
+Install the latest stable release from CRAN (v2.2.0):
 
 ```r
 install.packages("Orangutan")
@@ -112,7 +131,7 @@ install.packages("Orangutan")
 
 ### Development version (GitHub)
 
-Install the development version directly from GitHub (v2.1.0):
+Install the development version directly from GitHub (v2.2.0):
 
 ```r
 install.packages("pak")
@@ -204,7 +223,13 @@ run_orangutan(
   ),
   
   # ---------- Multivariate test seeds ----------
-  seeds = list(betadisper = 123, permanova = 456),   # Seed for reproducible dispersion/randomization calculations and permutation tests
+  seeds = list(betadisper = 123, permanova = 456, hull = 123, dapc_cv = 789),   # Seeds for reproducible dispersion, permutation, hull bootstraps, and DAPC cross-validation
+  
+  # ---------- DAPC cross-validation ----------
+  dapc_cv_k = 10,                    # Number of cross-validation folds (use 0 or 1 to skip)
+  
+  # ---------- PCA hull-area bootstrap ----------
+  hull_boot_B = 999,                 # Bootstrap resamples for hull-area confidence intervals
   
   # ---------- Messaging ----------
   verbose = FALSE                                    # Whether to print progress messages in console
@@ -223,7 +248,9 @@ run_orangutan(
 - species_to_encircle: Species names to highlight (draw polygons) in PCA/DAPC plots.
 - palette_name: RColorBrewer palette to use for colors (default "Paired").
 - custom_colors: Optional named vector of hex codes for species (e.g., `c(SpeciesA = "#FF0000")`).
-- seeds: Named list of seeds for reproducible random steps (default: `list(betadisper = 123, permanova = 456)`).
+- seeds: Named list of seeds for reproducible random steps (default: `list(betadisper = 123, permanova = 456, hull = 123, dapc_cv = 789)`).
+- dapc_cv_k: Number of folds for DAPC cross-validation (default 10; 0/1 skips the analysis).
+- hull_boot_B: Number of bootstrap resamples for PCA hull-area confidence intervals (default 999).
 - label_templates: Optional list to tweak plot labels and titles (sprintf-style templates).
 - point_aes, mean_aes, violin_aes, box_aes, label_aes: Lists to customize plot appearance (see Plot customization below).
 
